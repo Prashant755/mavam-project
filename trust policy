@@ -1,0 +1,24 @@
+trust policy for more than 2 repos
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::381491944081:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+                "StringEquals": {
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                },
+                "StringLike": {
+                    "token.actions.githubusercontent.com:sub": [
+                        "repo:Prashant755@100234896/git_hub_java_jar_to_s3@1448009285:ref:refs/heads/main",
+                        "repo:Prashant755@100234896/mavam-project@1446943492:ref:refs/heads/main"
+                    ]
+                }
+            }
+        }
+    ]
+}
