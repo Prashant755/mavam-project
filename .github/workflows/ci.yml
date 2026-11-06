@@ -1,0 +1,86 @@
+
+name: Build Java JAR and Upload to S3
+
+# Workflow triggers
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+# Required GitHub permissions for OIDC
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    name: Build Java and Upload to S3
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Step 1: Checkout GitHub repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Install Java 17
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # Step 3: Verify Java and Maven
+      - name: Check Java and Maven
+        run: |
+          java -version
+          mvn -version
+
+      # Step 4: Build Java JAR
+      - name: Build JAR
+        run: mvn clean package -DskipTests=false
+
+      # Step 5: Verify generated JAR
+      - name: Verify JAR
+        shell: bash
+        run: |
+          ls -lh target/*.jar
+
+      # Step 6: Configure AWS credentials using OIDC
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Step 7: Verify AWS identity
+      - name: Verify AWS Identity
+        run: |
+          aws sts get-caller-identity
+
+      # Step 8: Upload JAR to S3
+      - name: Upload JAR to S3
+        shell: bash
+        run: |
+          mapfile -t JARS < <(
+            find target -maxdepth 1 -type f -name '*.jar' \
+            ! -name '*-sources.jar' \
+            ! -name '*-javadoc.jar'
+          )
+
+          if [ "${#JARS[@]}" -ne 1 ]; then
+            echo "Expected exactly one application JAR."
+            echo "Found: ${#JARS[@]}"
+            exit 1
+          fi
+
+          aws s3 cp "${JARS[0]}" \
+            "s3://${{ vars.S3_BUCKET }}/app.jar"
+
+      # Step 9: Verify uploaded file
+      - name: Verify S3 Upload
+        run: |
+          aws s3 ls "s3://${{ vars.S3_BUCKET }}/app.jar"
